@@ -21,14 +21,13 @@ int main()
     entt::registry registry;
     LuaManager luaManager(registry);
     luaManager.Init();
-    luaManager.RunFile("src\\lua\\scripts\\entities.lua");
 
     GameState current_state = MAIN_MENU;
     GameState previous_state = MAIN_MENU;
     bool running = true;
 
     MainMenuState mainMenu;
-    GameplayState gameplay(registry);
+    GameplayState gameplay(registry, luaManager);
     EditorState editor;
 
     IGameState* activeState = &mainMenu;

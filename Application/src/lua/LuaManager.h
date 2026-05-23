@@ -13,6 +13,7 @@ class LuaManager
 	public:
 		LuaManager(entt::registry& reg);
 		void Init();
+		void Reset();
 		void Shutdown();
 		void RunFile(const std::string& path);
 		void RunString(const std::string& str);
