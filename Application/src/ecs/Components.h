@@ -1,6 +1,5 @@
 #pragma once
-#include "lua.hpp" 
-#include "raylib.h"
+#include "lua.hpp"
 #include "entt.hpp"
 
 
@@ -31,12 +30,6 @@ struct CollisionComponent
 {
 	float width;
 	float height;
-};
-
-struct SpriteComponent
-{
-	Texture2D spriteTexture;
-	Rectangle rectangle;
 };
 
 struct BehaviourComponent

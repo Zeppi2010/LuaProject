@@ -11,13 +11,13 @@ void RenderSystem(entt::registry& registry)
 				(int)collision.width, (int)collision.height, WHITE);
 		});
 
-	// rita spelare och andra sprites
-	auto spriteView = registry.view<SpriteComponent, TransformComponent>();
-	spriteView.each([&](auto entity, SpriteComponent& sprite, TransformComponent& transform)
+	auto characterView = registry.view<TransformComponent, CollisionComponent>();
+	characterView.each([&](auto entity, TransformComponent& transform, CollisionComponent& collision)
 		{
-			if (!registry.all_of<PlatformTagComponent>(entity))
+			if (!registry.all_of<PlatformTagComponent>(entity) && !registry.all_of<AttackTagComponent>(entity))
 			{
-				DrawRectangle((int)transform.xPos, (int)transform.yPos, 25, 75, RED);
+				DrawRectangle((int)transform.xPos, (int)transform.yPos,
+					(int)collision.width, (int)collision.height, RED);
 			}
 		});
 
@@ -40,7 +40,7 @@ void MovementSystem(entt::registry& registry)
 		{
 			if (physics.isGrounded)
 			{
-				velocity.xV = 0;  // ? nollställ bara när på marken
+				velocity.xV = 0;  // ? nollstï¿½ll bara nï¿½r pï¿½ marken
 				stun.groundedFrames++;
 				if (stun.groundedFrames >= 120)
 					registry.remove<StunnedComponent>(entity);
@@ -122,7 +122,7 @@ void CollisionSystem(entt::registry& registry)
 }
 void AttackSystem(entt::registry& registry)
 {
-	// skapa attack när SPACE trycks
+	// skapa attack nï¿½r SPACE trycks
 	auto playerView = registry.view<PlayerTagComponent, TransformComponent, CollisionComponent, FacingComponent>();
 	playerView.each([&](auto playerEntity, TransformComponent& transform, CollisionComponent& collision, FacingComponent& facing)
 		{
@@ -166,7 +166,7 @@ void AttackSystem(entt::registry& registry)
 
 					if (overlaps)
 					{
-						// kolla om fienden redan träffats av denna attack
+						// kolla om fienden redan trï¿½ffats av denna attack
 						if (registry.all_of<HitByComponent>(enemyEntity))
 						{
 							auto& hitBy = registry.get<HitByComponent>(enemyEntity);

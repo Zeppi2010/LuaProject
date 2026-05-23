@@ -15,7 +15,6 @@ end
 
 local player = ecs.create_entity()
 ecs.add_transform(player, 100.0, 200.0)
-ecs.add_sprite(player)
 ecs.add_velocity(player, 0.0, 0.0)
 ecs.add_player_tag(player)
 ecs.add_physics(player, 1.0)
@@ -24,13 +23,11 @@ ecs.add_facing(player)
 
 local platform = ecs.create_entity()
 ecs.add_transform(platform, 0.0, 500.0)
-ecs.add_sprite(platform)
 ecs.add_collision(platform, 900.0, 20.0)
 ecs.add_platform_tag(platform)
 
 local enemy = ecs.create_entity()
 ecs.add_transform(enemy, 400.0, 425.0)
-ecs.add_sprite(enemy)
 ecs.add_velocity(enemy, 0.0, 0.0)
 ecs.add_physics(enemy, 1.0)
 ecs.add_collision(enemy, 25.0, 75.0)

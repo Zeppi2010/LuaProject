@@ -32,14 +32,6 @@ void LuaManager::Init()
                     registry.emplace<BehaviourComponent>(entity, thread, ref);
                 }
             })
-        .addFunction("add_sprite", [this](uint32_t id)
-            {
-                auto entity = (entt::entity)id;
-                if (registry.valid(entity))
-                {
-                    registry.emplace<SpriteComponent>(entity, Texture2D{}, Rectangle{});
-                }
-            })
         .addFunction("add_player_tag", [this](uint32_t id)
             {
                 auto entity = (entt::entity)id;
@@ -144,13 +136,23 @@ void LuaManager::Init()
         .addFunction("set_velocity_x", [this](uint32_t id, float xV)
             {
                 auto entity = (entt::entity)id;
-                if (registry.valid(entity))
+                if (registry.valid(entity) && registry.all_of<VelocityComponent>(entity))
                 {
                     auto& velocity = registry.get<VelocityComponent>(entity);
                     velocity.xV = xV;
                 }
             })
         .endNamespace();
+}
+void LuaManager::Reset()
+{
+    auto view = registry.view<BehaviourComponent>();
+    view.each([this](auto entity, BehaviourComponent& behaviour)
+        {
+            if (behaviour.coRoutine != LUA_NOREF && behaviour.coRoutine != LUA_REFNIL)
+                luaL_unref(L, LUA_REGISTRYINDEX, behaviour.coRoutine);
+        });
+    registry.clear();
 }
 void LuaManager::Shutdown()
 {
@@ -206,11 +208,11 @@ void LuaManager::UpdateCoroutines()
 
             if (status == LUA_YIELD)
             {
-                // co-routinen pausade, fortsätt nästa frame
+                // co-routinen pausade, fortsï¿½tt nï¿½sta frame
             }
             else if (status == LUA_OK)
             {
-                // co-routinen är klar
+                // co-routinen ï¿½r klar
                 luaL_unref(L, LUA_REGISTRYINDEX, behaviour.coRoutine);
                 behaviour.thread = nullptr;
             }

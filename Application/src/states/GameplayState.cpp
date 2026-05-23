@@ -1,8 +1,12 @@
 #include "GameplayState.h"
 
-GameplayState::GameplayState(entt::registry& reg) : registry(reg) {}
+GameplayState::GameplayState(entt::registry& reg, LuaManager& lua) : registry(reg), luaManager(lua) {}
 
-void GameplayState::Init() {}
+void GameplayState::Init()
+{
+    luaManager.Reset();
+    luaManager.RunFile("src\\lua\\scripts\\entities.lua");
+}
 
 void GameplayState::Update(GameState& current_state)
 {
