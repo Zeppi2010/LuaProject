@@ -84,7 +84,8 @@ function boss_behaviour(entity_id)
                 end
 
                 if phase == 2 and ecs.is_grounded(entity_id) and math.random(1, 120) == 1 then
-                    ecs.set_velocity_y(entity_id, -400.0)
+                    local leapX = (px > ex) and 480.0 or -480.0
+                    ecs.set_velocity(entity_id, leapX, -400.0)
                 end
             end
         end

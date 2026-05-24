@@ -272,7 +272,8 @@ void AttackSystem(entt::registry& registry)
 							if (!isBoss)
 								registry.emplace_or_replace<StunnedComponent>(enemyEntity);
 							health.currentHP -= damage.damage;
-							enemyVelocity.xV = (enemyTransform.xPos > atkTransform.xPos) ? 200.0f : -200.0f;
+							float knockbackX = isBoss ? 80.0f : 200.0f;
+							enemyVelocity.xV = (enemyTransform.xPos > atkTransform.xPos) ? knockbackX : -knockbackX;
 							enemyVelocity.yV = -150.0f;
 
 							if (health.currentHP <= 0)
