@@ -74,8 +74,9 @@ void GameplayState::Update(GameState& current_state)
     ClearBackground(BLUE);
     RenderSystem(registry);
 
+    bool hasPlayer  = !registry.view<PlayerTagComponent>().empty();
     bool hasEnemies = !registry.view<EnemyTagComponent>().empty();
-    if (!hasEnemies)
+    if (hasPlayer && !hasEnemies)
         DrawText("Room cleared!  Move right ->", 270, 30, 20, YELLOW);
 
     EndDrawing();

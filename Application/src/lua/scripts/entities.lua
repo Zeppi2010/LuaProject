@@ -99,7 +99,57 @@ function boss_behaviour(entity_id)
 end
 
 function room_manager(entity_id)
+    -- Try loading editor-saved level, fall back to built-in rooms
+    local ok, level = pcall(dofile, "src/lua/scripts/level.lua")
+
+    local rooms_data
+    if ok and type(level) == "table" and level.rooms then
+        rooms_data = level.rooms
+    else
+        rooms_data = {
+            {
+                spawn = { x=100, y=425 },
+                platforms = {
+                    {x=0,   y=500, w=300, h=20},
+                    {x=350, y=420, w=200, h=20},
+                    {x=600, y=500, w=300, h=20},
+                },
+                enemies = { {x=640, y=425, boss=false} },
+            },
+            {
+                spawn = { x=100, y=425 },
+                platforms = {
+                    {x=0,   y=500, w=180, h=20},
+                    {x=160, y=390, w=180, h=20},
+                    {x=460, y=390, w=180, h=20},
+                    {x=720, y=500, w=180, h=20},
+                },
+                enemies = {
+                    {x=190, y=315, boss=false},
+                    {x=470, y=315, boss=false},
+                },
+            },
+            {
+                spawn = { x=100, y=425 },
+                platforms = { {x=0, y=500, w=900, h=20} },
+                enemies = { {x=600, y=460, boss=true} },
+            },
+        }
+    end
+
+    local num_rooms = #rooms_data
     local current_platforms = {}
+
+    -- Spawn player at room-1 spawn point
+    local s1 = rooms_data[1].spawn
+    local player = ecs.create_entity()
+    ecs.add_transform(player, s1.x, s1.y)
+    ecs.add_velocity(player, 0.0, 0.0)
+    ecs.add_player_tag(player)
+    ecs.add_physics(player, 1.0)
+    ecs.add_collision(player, 25.0, 75.0)
+    ecs.add_facing(player)
+    ecs.add_health(player, 100)
 
     local function clear_platforms()
         for _, pid in ipairs(current_platforms) do
@@ -108,85 +158,56 @@ function room_manager(entity_id)
         current_platforms = {}
     end
 
-    local function spawn_platforms(layout)
-        for _, p in ipairs(layout) do
-            local id = ecs.add_platform(p[1], p[2], p[3], p[4])
-            table.insert(current_platforms, id)
+    local function load_room(idx)
+        local room = rooms_data[idx]
+        for _, p in ipairs(room.platforms) do
+            table.insert(current_platforms, ecs.add_platform(p.x, p.y, p.w, p.h))
+        end
+        for _, e in ipairs(room.enemies) do
+            if e.boss then
+                local boss = ecs.create_entity()
+                ecs.add_transform(boss, e.x, e.y)
+                ecs.add_velocity(boss, 0.0, 0.0)
+                ecs.add_physics(boss, 1.0)
+                ecs.add_collision(boss, 60.0, 40.0)
+                ecs.add_health(boss, 60)
+                ecs.add_enemy_tag(boss)
+                ecs.add_boss_tag(boss)
+                ecs.add_behaviour(boss, "boss_behaviour")
+            else
+                local en = ecs.create_entity()
+                ecs.add_transform(en, e.x, e.y)
+                ecs.add_velocity(en, 0.0, 0.0)
+                ecs.add_physics(en, 1.0)
+                ecs.add_collision(en, 25.0, 75.0)
+                ecs.add_health(en, 30)
+                ecs.add_enemy_tag(en)
+                ecs.add_behaviour(en, "enemy_patrol")
+            end
         end
     end
 
-    local function spawn_enemy(x, y)
-        local e = ecs.create_entity()
-        ecs.add_transform(e, x, y)
-        ecs.add_velocity(e, 0.0, 0.0)
-        ecs.add_physics(e, 1.0)
-        ecs.add_collision(e, 25.0, 75.0)
-        ecs.add_health(e, 30)
-        ecs.add_enemy_tag(e)
-        ecs.add_behaviour(e, "enemy_patrol")
-    end
-
-    -- {x, y, width, height} per platform per room
-    local room_layouts = {
-        -- Room 1: left ground, middle elevated, right ground
-        { {0, 500, 300, 20}, {350, 420, 200, 20}, {600, 500, 300, 20} },
-        -- Room 2: two short ground stubs + two elevated platforms
-        { {0, 500, 180, 20}, {160, 390, 180, 20}, {460, 390, 180, 20}, {720, 500, 180, 20} },
-        -- Room 3: full ground for boss
-        { {0, 500, 900, 20} },
-    }
-
-    local rooms = {
-        function() spawn_enemy(640.0, 425.0) end,
-        function()
-            spawn_enemy(190.0, 315.0)
-            spawn_enemy(470.0, 315.0)
-        end,
-        function()
-            local boss = ecs.create_entity()
-            ecs.add_transform(boss, 600.0, 460.0)
-            ecs.add_velocity(boss, 0.0, 0.0)
-            ecs.add_physics(boss, 1.0)
-            ecs.add_collision(boss, 60.0, 40.0)
-            ecs.add_health(boss, 60)
-            ecs.add_enemy_tag(boss)
-            ecs.add_boss_tag(boss)
-            ecs.add_behaviour(boss, "boss_behaviour")
-        end,
-    }
-
-    spawn_platforms(room_layouts[1])
-    rooms[1]()
+    load_room(1)
     local current = 1
 
     while true do
-        local is_last = (current == #rooms)
-        if is_last then
-            if ecs.get_boss_count() == 0 then
+        if current == num_rooms then
+            if ecs.get_enemy_count() == 0 and ecs.get_boss_count() == 0 then
                 ecs.trigger_win()
             end
         else
             local px, py = ecs.get_player_position()
-            if ecs.get_enemy_count() == 0 and px >= 860.0 then
+            if ecs.get_enemy_count() == 0 and ecs.get_boss_count() == 0 and px >= 860.0 then
                 current = current + 1
                 clear_platforms()
-                spawn_platforms(room_layouts[current])
-                ecs.reset_player_position(50.0, 200.0)
-                rooms[current]()
+                local sp = rooms_data[current].spawn
+                ecs.reset_player_position(sp.x, sp.y)
+                load_room(current)
             end
         end
         coroutine.yield()
     end
 end
-
-local player = ecs.create_entity()
-ecs.add_transform(player, 100.0, 200.0)
-ecs.add_velocity(player, 0.0, 0.0)
-ecs.add_player_tag(player)
-ecs.add_physics(player, 1.0)
-ecs.add_collision(player, 25.0, 75.0)
-ecs.add_facing(player)
-ecs.add_health(player, 100)
 
 local manager = ecs.create_entity()
 ecs.add_behaviour(manager, "room_manager")

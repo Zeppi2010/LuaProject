@@ -28,7 +28,7 @@ int main()
 
     MainMenuState mainMenu;
     GameplayState gameplay(registry, luaManager);
-    EditorState editor;
+    EditorState editor(luaManager.GetState());
 
     IGameState* activeState = &mainMenu;
     activeState->Init();

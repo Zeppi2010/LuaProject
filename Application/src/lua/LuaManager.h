@@ -20,5 +20,6 @@ class LuaManager
 		void RunString(const std::string& str);
 		void UpdateCoroutines();
 		bool HasWon() const { return won; }
+		lua_State* GetState() const { return L; }
 
 };
