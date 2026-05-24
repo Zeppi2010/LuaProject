@@ -66,6 +66,11 @@ struct StunnedComponent
 	int groundedFrames = 0;
 };
 
+struct InvincibilityComponent
+{
+	int framesLeft;
+};
+
 struct PlayerTagComponent
 {
 
