@@ -69,6 +69,14 @@ void MovementSystem(entt::registry& registry)
 			if (inv.framesLeft <= 0)
 				registry.remove<InvincibilityComponent>(entity);
 		});
+
+	auto cooldownView = registry.view<AttackCooldownComponent>();
+	cooldownView.each([&](auto entity, AttackCooldownComponent& cd)
+		{
+			cd.framesLeft--;
+			if (cd.framesLeft <= 0)
+				registry.remove<AttackCooldownComponent>(entity);
+		});
 	physView.each([GRAVITY, dt](auto entity, PhysicsComponent& physics, VelocityComponent& velocity)
 		{
 			if (!physics.isGrounded)
@@ -150,17 +158,18 @@ void AttackSystem(entt::registry& registry)
 	auto playerView = registry.view<PlayerTagComponent, TransformComponent, CollisionComponent, FacingComponent>();
 	playerView.each([&](auto playerEntity, TransformComponent& transform, CollisionComponent& collision, FacingComponent& facing)
 		{
-			if (IsKeyPressed(KEY_SPACE))
+			if (IsKeyPressed(KEY_SPACE) && !registry.all_of<AttackCooldownComponent>(playerEntity))
 			{
-				auto attack = registry.create();
 				float attackX = facing.facingRight ?
 					transform.xPos + collision.width :
 					transform.xPos - 30.0f;
+				auto attack = registry.create();
 				registry.emplace<TransformComponent>(attack, attackX, transform.yPos + 20.0f);
 				registry.emplace<CollisionComponent>(attack, 30.0f, 40.0f);
 				registry.emplace<AttackTagComponent>(attack);
 				registry.emplace<DamageComponent>(attack, 10);
-				registry.emplace<AttackComponent>(attack, 15, playerEntity);
+				registry.emplace<AttackComponent>(attack, 15, playerEntity, facing.facingRight);
+				registry.emplace<AttackCooldownComponent>(playerEntity, 25);
 			}
 		});
 
@@ -168,6 +177,16 @@ void AttackSystem(entt::registry& registry)
 	auto attackView = registry.view<AttackTagComponent, TransformComponent, CollisionComponent, AttackComponent, DamageComponent>();
 	attackView.each([&](auto attackEntity, TransformComponent& atkTransform, CollisionComponent& atkCollision, AttackComponent& attack, DamageComponent& damage)
 		{
+			if (registry.valid(attack.owner) && registry.all_of<TransformComponent, CollisionComponent>(attack.owner))
+			{
+				auto& ownerT = registry.get<TransformComponent>(attack.owner);
+				auto& ownerC = registry.get<CollisionComponent>(attack.owner);
+				atkTransform.xPos = attack.facingRight ?
+					ownerT.xPos + ownerC.width :
+					ownerT.xPos - atkCollision.width;
+				atkTransform.yPos = ownerT.yPos + 20.0f;
+			}
+
 			attack.framesLeft--;
 
 			bool ownerIsEnemy = registry.valid(attack.owner) && registry.all_of<EnemyTagComponent>(attack.owner);

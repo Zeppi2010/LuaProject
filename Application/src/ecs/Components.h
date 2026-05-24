@@ -49,6 +49,12 @@ struct AttackComponent
 {
 	int framesLeft;
 	entt::entity owner;
+	bool facingRight;
+};
+
+struct AttackCooldownComponent
+{
+	int framesLeft;
 };
 
 struct FacingComponent

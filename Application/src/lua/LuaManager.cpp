@@ -153,7 +153,7 @@ void LuaManager::Init()
                 registry.emplace<CollisionComponent>(attack, 30.0f, 40.0f);
                 registry.emplace<AttackTagComponent>(attack);
                 registry.emplace<DamageComponent>(attack, 10);
-                registry.emplace<AttackComponent>(attack, 15, entity);
+                registry.emplace<AttackComponent>(attack, 15, entity, attackRight);
             })
         .addFunction("set_velocity_x", [this](uint32_t id, float xV)
             {
