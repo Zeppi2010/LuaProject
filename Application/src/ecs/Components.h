@@ -69,7 +69,7 @@ struct HitByComponent
 
 struct StunnedComponent
 {
-	int groundedFrames = 0;
+	int framesLeft = 45;
 };
 
 struct InvincibilityComponent

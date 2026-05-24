@@ -55,12 +55,10 @@ void MovementSystem(entt::registry& registry)
 	stunView.each([&](auto entity, StunnedComponent& stun, VelocityComponent& velocity, PhysicsComponent& physics)
 		{
 			if (physics.isGrounded)
-			{
-				velocity.xV = 0;
-				stun.groundedFrames++;
-				if (stun.groundedFrames >= 120)
-					registry.remove<StunnedComponent>(entity);
-			}
+				velocity.xV = 0.0f;
+			stun.framesLeft--;
+			if (stun.framesLeft <= 0)
+				registry.remove<StunnedComponent>(entity);
 		});
 
 	auto invincView = registry.view<InvincibilityComponent>();
@@ -270,7 +268,7 @@ void AttackSystem(entt::registry& registry)
 							registry.emplace_or_replace<HitByComponent>(enemyEntity, attackEntity);
 							registry.emplace_or_replace<InvincibilityComponent>(enemyEntity, isBoss ? 60 : 30);
 							if (!isBoss)
-								registry.emplace_or_replace<StunnedComponent>(enemyEntity);
+								registry.emplace_or_replace<StunnedComponent>(enemyEntity, 45);
 							health.currentHP -= damage.damage;
 							float knockbackX = isBoss ? 80.0f : 200.0f;
 							enemyVelocity.xV = (enemyTransform.xPos > atkTransform.xPos) ? knockbackX : -knockbackX;
