@@ -91,6 +91,22 @@ void MovementSystem(entt::registry& registry)
 			transform.xPos += velocity.xV * dt;
 			transform.yPos += velocity.yV * dt;
 		});
+
+	const float SCREEN_WIDTH = 900.0f;
+	auto boundsView = registry.view<TransformComponent, CollisionComponent, PhysicsComponent, VelocityComponent>();
+	boundsView.each([SCREEN_WIDTH](auto entity, TransformComponent& transform, CollisionComponent& collision, PhysicsComponent&, VelocityComponent& velocity)
+		{
+			if (transform.xPos < 0.0f)
+			{
+				transform.xPos = 0.0f;
+				if (velocity.xV < 0.0f) velocity.xV = 0.0f;
+			}
+			if (transform.xPos + collision.width > SCREEN_WIDTH)
+			{
+				transform.xPos = SCREEN_WIDTH - collision.width;
+				if (velocity.xV > 0.0f) velocity.xV = 0.0f;
+			}
+		});
 }
 
 void InputSystem(entt::registry& registry)
@@ -164,8 +180,9 @@ void AttackSystem(entt::registry& registry)
 				float attackX = facing.facingRight ?
 					transform.xPos + collision.width :
 					transform.xPos - 30.0f;
+				float attackY = transform.yPos + (collision.height - 40.0f) / 2.0f;
 				auto attack = registry.create();
-				registry.emplace<TransformComponent>(attack, attackX, transform.yPos + 20.0f);
+				registry.emplace<TransformComponent>(attack, attackX, attackY);
 				registry.emplace<CollisionComponent>(attack, 30.0f, 40.0f);
 				registry.emplace<AttackTagComponent>(attack);
 				registry.emplace<DamageComponent>(attack, 10);

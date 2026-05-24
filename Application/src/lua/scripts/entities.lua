@@ -36,12 +36,14 @@ end
 
 function boss_behaviour(entity_id)
     local phase = 1
+    local boss_width    = 60.0
     local PHASE1_SPEED  = 120.0
     local PHASE1_DAMAGE = 15
-    local PHASE1_RANGE  = 80.0
+    local PHASE1_RANGE  = 20.0
     local PHASE2_SPEED  = 100.0
     local PHASE2_DAMAGE = 20
-    local PHASE2_RANGE  = 50.0
+    local PHASE2_RANGE  = 20.0
+    local PLAYER_WIDTH  = 25.0
 
     while true do
         if not ecs.is_stunned(entity_id) then
@@ -49,6 +51,7 @@ function boss_behaviour(entity_id)
 
             if phase == 1 and hp <= maxhp / 2 then
                 phase = 2
+                boss_width = 30.0
                 local ex, ey = ecs.get_position(entity_id)
                 ecs.set_collision_size(entity_id, 30.0, 80.0)
                 ecs.set_position(entity_id, ex + 15.0, ey - 40.0)
@@ -56,13 +59,19 @@ function boss_behaviour(entity_id)
 
             local px, py = ecs.get_player_position()
             local ex, ey = ecs.get_position(entity_id)
-            local dist = math.abs(px - ex)
+
+            local gap
+            if px >= ex then
+                gap = math.max(0.0, px - (ex + boss_width))
+            else
+                gap = math.max(0.0, ex - (px + PLAYER_WIDTH))
+            end
 
             local speed  = (phase == 1) and PHASE1_SPEED  or PHASE2_SPEED
             local damage = (phase == 1) and PHASE1_DAMAGE or PHASE2_DAMAGE
             local range  = (phase == 1) and PHASE1_RANGE  or PHASE2_RANGE
 
-            if dist <= range then
+            if gap <= range then
                 ecs.set_velocity_x(entity_id, 0.0)
                 for i = 1, 30 do coroutine.yield() end
                 ecs.create_enemy_attack(entity_id, damage)

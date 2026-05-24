@@ -148,8 +148,9 @@ void LuaManager::Init()
                 bool attackRight = px > transform.xPos;
                 float attackX = attackRight ? transform.xPos + collision.width : transform.xPos - 30.0f;
 
+                float attackY = transform.yPos + (collision.height - 40.0f) / 2.0f;
                 auto attack = registry.create();
-                registry.emplace<TransformComponent>(attack, attackX, transform.yPos + 20.0f);
+                registry.emplace<TransformComponent>(attack, attackX, attackY);
                 registry.emplace<CollisionComponent>(attack, 30.0f, 40.0f);
                 registry.emplace<AttackTagComponent>(attack);
                 registry.emplace<DamageComponent>(attack, damage);
