@@ -1,6 +1,7 @@
 #include "systems.h"
 #include <iostream>
 #include <algorithm>
+#include <string>
 
 void RenderSystem(entt::registry& registry)
 {
