@@ -34,6 +34,7 @@ int main()
     activeState->Init();
 
     InitWindow(900, 600, "Title");
+    SetTargetFPS(60);
     SetExitKey(0);
 
     while (!WindowShouldClose() && running)
