@@ -17,4 +17,6 @@ private:
     LuaManager& luaManager;
     bool gameOver = false;
     int gameOverTimer = 0;
+    bool gameWon = false;
+    int gameWonTimer = 0;
 };

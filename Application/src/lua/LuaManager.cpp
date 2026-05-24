@@ -218,6 +218,25 @@ void LuaManager::Init()
                 if (registry.valid(entity))
                     registry.emplace<BossTagComponent>(entity);
             })
+        .addFunction("get_boss_count", [this]() -> int
+            {
+                return (int)registry.view<BossTagComponent>().size();
+            })
+        .addFunction("reset_player_position", [this](float x, float y)
+            {
+                auto view = registry.view<PlayerTagComponent, TransformComponent, VelocityComponent>();
+                view.each([x, y](auto entity, TransformComponent& t, VelocityComponent& v)
+                    {
+                        t.xPos = x;
+                        t.yPos = y;
+                        v.xV = 0.0f;
+                        v.yV = 0.0f;
+                    });
+            })
+        .addFunction("trigger_win", [this]()
+            {
+                won = true;
+            })
         .addFunction("set_velocity_x", [this](uint32_t id, float xV)
             {
                 auto entity = (entt::entity)id;
@@ -238,6 +257,7 @@ void LuaManager::Reset()
                 luaL_unref(L, LUA_REGISTRYINDEX, behaviour.coRoutine);
         });
     registry.clear();
+    won = false;
 }
 void LuaManager::Shutdown()
 {

@@ -9,6 +9,7 @@ class LuaManager
 	private:
 		lua_State* L;
 		entt::registry& registry;
+		bool won = false;
 
 	public:
 		LuaManager(entt::registry& reg);
@@ -18,5 +19,6 @@ class LuaManager
 		void RunFile(const std::string& path);
 		void RunString(const std::string& str);
 		void UpdateCoroutines();
+		bool HasWon() const { return won; }
 
 };

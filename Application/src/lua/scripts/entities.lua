@@ -93,11 +93,27 @@ function boss_behaviour(entity_id)
     end
 end
 
-function game_manager(entity_id)
-    local boss_spawned = false
-    while true do
-        if not boss_spawned and ecs.get_enemy_count() == 0 then
-            boss_spawned = true
+function room_manager(entity_id)
+    local function spawn_enemy(x, y)
+        local e = ecs.create_entity()
+        ecs.add_transform(e, x, y)
+        ecs.add_velocity(e, 0.0, 0.0)
+        ecs.add_physics(e, 1.0)
+        ecs.add_collision(e, 25.0, 75.0)
+        ecs.add_health(e, 30)
+        ecs.add_enemy_tag(e)
+        ecs.add_behaviour(e, "enemy_patrol")
+    end
+
+    local rooms = {
+        function()
+            spawn_enemy(600.0, 425.0)
+        end,
+        function()
+            spawn_enemy(350.0, 425.0)
+            spawn_enemy(650.0, 425.0)
+        end,
+        function()
             local boss = ecs.create_entity()
             ecs.add_transform(boss, 600.0, 460.0)
             ecs.add_velocity(boss, 0.0, 0.0)
@@ -107,6 +123,25 @@ function game_manager(entity_id)
             ecs.add_enemy_tag(boss)
             ecs.add_boss_tag(boss)
             ecs.add_behaviour(boss, "boss_behaviour")
+        end
+    }
+
+    local current = 1
+    rooms[current]()
+
+    while true do
+        local is_last = (current == #rooms)
+        if is_last then
+            if ecs.get_boss_count() == 0 then
+                ecs.trigger_win()
+            end
+        else
+            local px, py = ecs.get_player_position()
+            if ecs.get_enemy_count() == 0 and px >= 860.0 then
+                current = current + 1
+                ecs.reset_player_position(50.0, 200.0)
+                rooms[current]()
+            end
         end
         coroutine.yield()
     end
@@ -126,14 +161,5 @@ ecs.add_transform(platform, 0.0, 500.0)
 ecs.add_collision(platform, 900.0, 20.0)
 ecs.add_platform_tag(platform)
 
-local enemy = ecs.create_entity()
-ecs.add_transform(enemy, 400.0, 425.0)
-ecs.add_velocity(enemy, 0.0, 0.0)
-ecs.add_physics(enemy, 1.0)
-ecs.add_collision(enemy, 25.0, 75.0)
-ecs.add_health(enemy, 30)
-ecs.add_enemy_tag(enemy)
-ecs.add_behaviour(enemy, "enemy_patrol")
-
 local manager = ecs.create_entity()
-ecs.add_behaviour(manager, "game_manager")
+ecs.add_behaviour(manager, "room_manager")
