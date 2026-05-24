@@ -46,17 +46,16 @@ function boss_behaviour(entity_id)
     local PLAYER_WIDTH  = 25.0
 
     while true do
+        local hp, maxhp = ecs.get_health(entity_id)
+        if phase == 1 and hp <= maxhp / 2 then
+            phase = 2
+            boss_width = 30.0
+            local ex, ey = ecs.get_position(entity_id)
+            ecs.set_collision_size(entity_id, 30.0, 80.0)
+            ecs.set_position(entity_id, ex + 15.0, ey - 40.0)
+        end
+
         if not ecs.is_stunned(entity_id) then
-            local hp, maxhp = ecs.get_health(entity_id)
-
-            if phase == 1 and hp <= maxhp / 2 then
-                phase = 2
-                boss_width = 30.0
-                local ex, ey = ecs.get_position(entity_id)
-                ecs.set_collision_size(entity_id, 30.0, 80.0)
-                ecs.set_position(entity_id, ex + 15.0, ey - 40.0)
-            end
-
             local px, py = ecs.get_player_position()
             local ex, ey = ecs.get_position(entity_id)
 

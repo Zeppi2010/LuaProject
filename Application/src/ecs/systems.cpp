@@ -202,7 +202,7 @@ void AttackSystem(entt::registry& registry)
 				atkTransform.xPos = attack.facingRight ?
 					ownerT.xPos + ownerC.width :
 					ownerT.xPos - atkCollision.width;
-				atkTransform.yPos = ownerT.yPos + 20.0f;
+				atkTransform.yPos = ownerT.yPos + (ownerC.height - 40.0f) / 2.0f;
 			}
 
 			attack.framesLeft--;
@@ -264,14 +264,13 @@ void AttackSystem(entt::registry& registry)
 
 						if (overlaps)
 						{
-							if (registry.all_of<HitByComponent>(enemyEntity))
-							{
-								auto& hitBy = registry.get<HitByComponent>(enemyEntity);
-								if (hitBy.attackEntity == attackEntity) return;
-							}
+							if (registry.all_of<InvincibilityComponent>(enemyEntity)) return;
 
+							bool isBoss = registry.all_of<BossTagComponent>(enemyEntity);
 							registry.emplace_or_replace<HitByComponent>(enemyEntity, attackEntity);
-							registry.emplace_or_replace<StunnedComponent>(enemyEntity);
+							registry.emplace_or_replace<InvincibilityComponent>(enemyEntity, isBoss ? 60 : 30);
+							if (!isBoss)
+								registry.emplace_or_replace<StunnedComponent>(enemyEntity);
 							health.currentHP -= damage.damage;
 							enemyVelocity.xV = (enemyTransform.xPos > atkTransform.xPos) ? 200.0f : -200.0f;
 							enemyVelocity.yV = -150.0f;
