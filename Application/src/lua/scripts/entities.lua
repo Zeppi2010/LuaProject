@@ -1,24 +1,29 @@
+-- Patrol AI: walks toward the player, stops at platform edges,
+-- and attacks when close enough; freezes while stunned
 function enemy_patrol(entity_id)
-    local ATTACK_RANGE = 50.0
-    local WINDUP_FRAMES = 30
-    local ATTACK_FRAMES = 15
-    local COOLDOWN_FRAMES = 60
-    local E_WIDTH = 25.0
+    local ATTACK_RANGE    = 50.0
+    local WINDUP_FRAMES   = 30   -- frames before the hitbox appears
+    local ATTACK_FRAMES   = 15   -- frames the hitbox is active
+    local COOLDOWN_FRAMES = 60   -- frames before the next attack
+    local E_WIDTH  = 25.0
     local E_HEIGHT = 75.0
 
     while true do
         if not ecs.is_stunned(entity_id) then
             local px, py = ecs.get_player_position()
             local ex, ey = ecs.get_position(entity_id)
-            local dist = math.abs(px - ex)
+            local dist   = math.abs(px - ex)
 
             if dist <= ATTACK_RANGE then
+                -- Player is close: stop, wind up, attack, then cool down
                 ecs.set_velocity_x(entity_id, 0.0)
-                for i = 1, WINDUP_FRAMES do coroutine.yield() end
+                for i = 1, WINDUP_FRAMES   do coroutine.yield() end
                 ecs.create_enemy_attack(entity_id, 10)
-                for i = 1, ATTACK_FRAMES do coroutine.yield() end
+                for i = 1, ATTACK_FRAMES   do coroutine.yield() end
                 for i = 1, COOLDOWN_FRAMES do coroutine.yield() end
             else
+                -- Check 2px past the leading edge just below the feet;
+                -- stop if there is no platform there (edge detection)
                 local ground_y = ey + E_HEIGHT + 2.0
                 if px > ex then
                     if ecs.has_ground_at(ex + E_WIDTH + 2.0, ground_y) then
@@ -35,13 +40,17 @@ function enemy_patrol(entity_id)
                 end
             end
         end
-        coroutine.yield()
+        coroutine.yield()  -- pause until next frame
     end
 end
 
+-- Boss AI: two-phase behaviour.
+-- Phase 1 (full HP): wide collision box, faster, 15 damage.
+-- Phase 2 (below half HP): tall collision box, slightly slower, 20 damage,
+--   random screen-crossing leaps when grounded.
 function boss_behaviour(entity_id)
     local phase = 1
-    local boss_width    = 60.0
+    local boss_width    = 60.0  -- tracks current collision width for gap calculation
     local PHASE1_SPEED  = 120.0
     local PHASE1_DAMAGE = 15
     local PHASE1_RANGE  = 20.0
@@ -51,6 +60,7 @@ function boss_behaviour(entity_id)
     local PLAYER_WIDTH  = 25.0
 
     while true do
+        -- Phase transition: resize collision and shift position so feet stay on ground
         local hp, maxhp = ecs.get_health(entity_id)
         if phase == 1 and hp <= maxhp / 2 then
             phase = 2
@@ -64,6 +74,7 @@ function boss_behaviour(entity_id)
             local px, py = ecs.get_player_position()
             local ex, ey = ecs.get_position(entity_id)
 
+            -- Edge-to-edge gap so the range feels the same from both sides
             local gap
             if px >= ex then
                 gap = math.max(0.0, px - (ex + boss_width))
@@ -76,12 +87,14 @@ function boss_behaviour(entity_id)
             local range  = (phase == 1) and PHASE1_RANGE  or PHASE2_RANGE
 
             if gap <= range then
+                -- Attack sequence: wind up, release hitbox, cool down
                 ecs.set_velocity_x(entity_id, 0.0)
                 for i = 1, 30 do coroutine.yield() end
                 ecs.create_enemy_attack(entity_id, damage)
                 for i = 1, 15 do coroutine.yield() end
                 for i = 1, 60 do coroutine.yield() end
             else
+                -- Chase the player; phase 2 may randomly leap across the screen
                 if px > ex then
                     ecs.set_velocity_x(entity_id, speed)
                 else
@@ -98,8 +111,11 @@ function boss_behaviour(entity_id)
     end
 end
 
+-- Room manager: loads room data from the editor-saved level file (or falls back
+-- to built-in rooms), spawns the player, then handles room transitions and the
+-- win condition every frame
 function room_manager(entity_id)
-    -- Try loading editor-saved level, fall back to built-in rooms
+    -- Try to load the editor's saved level; fall back to three hardcoded rooms
     local ok, level = pcall(dofile, "src/lua/scripts/level.lua")
 
     local rooms_data
@@ -132,15 +148,15 @@ function room_manager(entity_id)
             {
                 spawn = { x=100, y=425 },
                 platforms = { {x=0, y=500, w=900, h=20} },
-                enemies = { {x=600, y=460, boss=true} },
+                enemies   = { {x=600, y=460, boss=true} },
             },
         }
     end
 
-    local num_rooms = #rooms_data
-    local current_platforms = {}
+    local num_rooms         = #rooms_data
+    local current_platforms = {}  -- tracks IDs of platforms in the current room
 
-    -- Spawn player at room-1 spawn point
+    -- Create the player at the first room's spawn point
     local s1 = rooms_data[1].spawn
     local player = ecs.create_entity()
     ecs.add_transform(player, s1.x, s1.y)
@@ -151,6 +167,7 @@ function room_manager(entity_id)
     ecs.add_facing(player)
     ecs.add_health(player, 100)
 
+    -- Removes all platform entities that belong to the current room
     local function clear_platforms()
         for _, pid in ipairs(current_platforms) do
             ecs.destroy_entity(pid)
@@ -158,6 +175,7 @@ function room_manager(entity_id)
         current_platforms = {}
     end
 
+    -- Spawns platforms and enemies defined for the given room index
     local function load_room(idx)
         local room = rooms_data[idx]
         for _, p in ipairs(room.platforms) do
@@ -192,10 +210,12 @@ function room_manager(entity_id)
 
     while true do
         if current == num_rooms then
+            -- Last room: trigger win once all enemies and the boss are dead
             if ecs.get_enemy_count() == 0 and ecs.get_boss_count() == 0 then
                 ecs.trigger_win()
             end
         else
+            -- Earlier rooms: advance when the room is clear AND the player walks to the right edge
             local px, py = ecs.get_player_position()
             if ecs.get_enemy_count() == 0 and ecs.get_boss_count() == 0 and px >= 860.0 then
                 current = current + 1
@@ -205,9 +225,10 @@ function room_manager(entity_id)
                 load_room(current)
             end
         end
-        coroutine.yield()
+        coroutine.yield()  -- check again next frame
     end
 end
 
+-- Create the manager entity that runs room_manager every frame
 local manager = ecs.create_entity()
 ecs.add_behaviour(manager, "room_manager")

@@ -8,6 +8,8 @@ static const char* LEVEL_PATH = "src/lua/scripts/level.lua";
 
 EditorState::EditorState(lua_State* L) : L(L) {}
 
+// Resets editor state and tries to load an existing saved level;
+// starts with a single default room if no file is found
 void EditorState::Init()
 {
     rooms.clear();
@@ -22,18 +24,20 @@ void EditorState::Init()
     if (rooms.empty())
     {
         EdRoom r;
-        r.platforms.push_back({0, 500, 900, 20});
+        r.platforms.push_back({0, 500, 900, 20});  // default floor platform
         rooms.push_back(r);
     }
 }
 
 void EditorState::Exit() {}
 
+// Snaps a coordinate to the nearest grid line
 float EditorState::Snap(float v) const
 {
     return std::round(v / GRID) * GRID;
 }
 
+// Draws a button and returns true on the frame the user left-clicks it
 bool EditorState::Button(float x, float y, float w, float h,
                           const char* label, bool active)
 {
@@ -50,14 +54,13 @@ bool EditorState::Button(float x, float y, float w, float h,
     return hovered && IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
 }
 
-// ---------- Canvas drawing ----------
-
+// Draws the grid background, all platforms, enemies, spawn marker,
+// and a ghost preview of the currently selected tool at the cursor
 void EditorState::DrawCanvas()
 {
-    // Background
     DrawRectangle(0, 0, 900, (int)CANVAS_H, Color{28, 28, 28, 255});
 
-    // Grid
+    // Subtle grid lines every GRID pixels to help with alignment
     for (int gx = 0; gx < 900; gx += (int)GRID)
         DrawLine(gx, 0, gx, (int)CANVAS_H, Color{42, 42, 42, 255});
     for (int gy = 0; gy < (int)CANVAS_H; gy += (int)GRID)
@@ -66,14 +69,14 @@ void EditorState::DrawCanvas()
     if (currentRoom >= (int)rooms.size()) return;
     auto& room = rooms[currentRoom];
 
-    // Platforms
+    // Draw each platform as a white rectangle with a dark outline
     for (auto& p : room.platforms)
     {
         DrawRectangle((int)p.x, (int)p.y, (int)p.w, (int)p.h, WHITE);
         DrawRectangleLinesEx({p.x, p.y, p.w, p.h}, 1, DARKGRAY);
     }
 
-    // Enemies / boss
+    // Draw enemies; RED for patrol, PURPLE for boss
     for (auto& e : room.enemies)
     {
         float ew = e.isBoss ? 60.0f : 25.0f;
@@ -86,14 +89,12 @@ void EditorState::DrawCanvas()
         DrawText(lbl, (int)(e.x + ew / 2 - lw / 2), (int)(e.y + eh / 2 - 8), 16, WHITE);
     }
 
-    // Spawn
-    {
-        DrawRectangle((int)room.spawnX, (int)room.spawnY, 25, 75, Color{0, 180, 0, 200});
-        DrawRectangleLinesEx({room.spawnX, room.spawnY, 25, 75}, 1, GREEN);
-        DrawText("S", (int)(room.spawnX + 8), (int)(room.spawnY + 28), 16, WHITE);
-    }
+    // Draw the player spawn point as a green rectangle with an "S" label
+    DrawRectangle((int)room.spawnX, (int)room.spawnY, 25, 75, Color{0, 180, 0, 200});
+    DrawRectangleLinesEx({room.spawnX, room.spawnY, 25, 75}, 1, GREEN);
+    DrawText("S", (int)(room.spawnX + 8), (int)(room.spawnY + 28), 16, WHITE);
 
-    // Preview at cursor
+    // Ghost preview: shows what will be placed before the user commits a click
     Vector2 raw = GetMousePosition();
     if (raw.y >= 0 && raw.y < CANVAS_H && raw.x >= 0 && raw.x < 900)
     {
@@ -102,22 +103,21 @@ void EditorState::DrawCanvas()
         {
             if (dragging)
             {
-                float px = std::min(sx, dragX);
-                float py = std::min(sy, dragY);
-                float pw = std::abs(sx - dragX);
-                float ph = std::abs(sy - dragY);
-                DrawRectangle((int)px, (int)py, (int)pw, (int)ph,
-                              Color{200, 200, 200, 60});
+                // Show the rectangle being dragged out
+                float px = std::min(sx, dragX), py = std::min(sy, dragY);
+                float pw = std::abs(sx - dragX), ph = std::abs(sy - dragY);
+                DrawRectangle((int)px, (int)py, (int)pw, (int)ph, Color{200, 200, 200, 60});
                 DrawRectangleLinesEx({px, py, pw, ph}, 1, WHITE);
             }
             else
             {
-                DrawRectangleLinesEx({sx, sy, 100, 20}, 1,
-                                     Color{200, 200, 200, 160});
+                // Show a 100×20 outline indicating where the drag would start
+                DrawRectangleLinesEx({sx, sy, 100, 20}, 1, Color{200, 200, 200, 160});
             }
         }
         else if (tool == EdTool::Enemy)
         {
+            // Cursor is at the feet; entity extends upward
             DrawRectangle((int)sx, (int)(sy - 75), 25, 75, Color{220, 50, 50, 90});
             DrawRectangleLinesEx({sx, sy - 75, 25, 75}, 1, RED);
         }
@@ -134,8 +134,7 @@ void EditorState::DrawCanvas()
     }
 }
 
-// ---------- Toolbar ----------
-
+// Draws the bottom toolbar: tool buttons, room navigation, and save/menu buttons
 void EditorState::DrawToolbar(GameState& current_state)
 {
     DrawRectangle(0, (int)TB_Y, 900, (int)TB_H, Color{20, 20, 20, 255});
@@ -144,13 +143,13 @@ void EditorState::DrawToolbar(GameState& current_state)
     float ty = TB_Y + 5;
     float th = TB_H - 10;
 
-    // Tools
+    // Tool selection buttons; the active tool is highlighted in blue
     if (Button(4,   ty, 82, th, "Platform", tool == EdTool::Platform)) tool = EdTool::Platform;
     if (Button(90,  ty, 65, th, "Enemy",    tool == EdTool::Enemy))    tool = EdTool::Enemy;
     if (Button(159, ty, 55, th, "Boss",     tool == EdTool::Boss))     tool = EdTool::Boss;
     if (Button(218, ty, 60, th, "Spawn",    tool == EdTool::Spawn))    tool = EdTool::Spawn;
 
-    // Room navigation
+    // Room navigation: previous, label, next
     if (Button(295, ty, 22, th, "<"))
         if (currentRoom > 0) currentRoom--;
 
@@ -162,6 +161,7 @@ void EditorState::DrawToolbar(GameState& current_state)
     if (Button(428, ty, 22, th, ">"))
         if (currentRoom < (int)rooms.size() - 1) currentRoom++;
 
+    // Add a new room after the current one (with a default floor); remove the current room
     if (Button(456, ty, 62, th, "+ Room"))
     {
         EdRoom r;
@@ -178,13 +178,11 @@ void EditorState::DrawToolbar(GameState& current_state)
         }
     }
 
-    // Last room label
+    // Remind the user that the last room is treated as the boss arena
     if (currentRoom == (int)rooms.size() - 1)
-    {
         DrawText("[Boss room]", 597, (int)(TB_Y + 17), 13, YELLOW);
-    }
 
-    // Save / Menu
+    // Flash "Saved!" for 2 seconds after a successful save
     if (savedFlash)
     {
         DrawText("Saved!", 710, (int)(TB_Y + 17), 14, GREEN);
@@ -201,16 +199,15 @@ void EditorState::DrawToolbar(GameState& current_state)
         current_state = MAIN_MENU;
 }
 
-// ---------- Main update ----------
-
+// Processes mouse input for placing and deleting objects, then draws the frame
 void EditorState::Update(GameState& current_state)
 {
-    Vector2 raw     = GetMousePosition();
-    float sx        = Snap(raw.x);
-    float sy        = Snap(raw.y);
-    bool  inCanvas  = (raw.y >= 0 && raw.y < CANVAS_H && raw.x >= 0 && raw.x < 900.0f);
+    Vector2 raw    = GetMousePosition();
+    float sx       = Snap(raw.x);
+    float sy       = Snap(raw.y);
+    bool inCanvas  = (raw.y >= 0 && raw.y < CANVAS_H && raw.x >= 0 && raw.x < 900.0f);
 
-    // Platform drag: release anywhere (cancel if outside canvas)
+    // Finish a platform drag when the mouse button is released anywhere
     if (dragging && IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
     {
         dragging = false;
@@ -218,6 +215,7 @@ void EditorState::Update(GameState& current_state)
         {
             float px = std::min(sx, dragX), py = std::min(sy, dragY);
             float pw = std::abs(sx - dragX), ph = std::abs(sy - dragY);
+            // Only create the platform if it meets the minimum size
             if (pw >= MIN_PLW && ph >= MIN_PLH)
                 rooms[currentRoom].platforms.push_back({px, py, pw, ph});
         }
@@ -231,11 +229,13 @@ void EditorState::Update(GameState& current_state)
         {
             if (tool == EdTool::Platform)
             {
+                // Start dragging to define the platform rectangle
                 dragging = true;
                 dragX = sx; dragY = sy;
             }
             else if (tool == EdTool::Enemy)
             {
+                // Cursor is at the feet, so subtract entity height for the top-left position
                 room.enemies.push_back({sx, sy - 75.0f, false});
             }
             else if (tool == EdTool::Boss)
@@ -259,13 +259,11 @@ void EditorState::Update(GameState& current_state)
     EndDrawing();
 }
 
-// ---------- Delete ----------
-
+// Checks the clicked position against enemies then platforms and removes the first match
 void EditorState::TryDelete(float sx, float sy)
 {
     auto& room = rooms[currentRoom];
 
-    // Enemies first (rendered on top)
     for (int i = (int)room.enemies.size() - 1; i >= 0; i--)
     {
         auto& e = room.enemies[i];
@@ -278,7 +276,6 @@ void EditorState::TryDelete(float sx, float sy)
         }
     }
 
-    // Platforms
     for (int i = (int)room.platforms.size() - 1; i >= 0; i--)
     {
         auto& p = room.platforms[i];
@@ -290,8 +287,7 @@ void EditorState::TryDelete(float sx, float sy)
     }
 }
 
-// ---------- Save ----------
-
+// Writes all room data to level.lua as a Lua table that the game can dofile()
 void EditorState::Save()
 {
     std::ofstream f(LEVEL_PATH);
@@ -319,15 +315,16 @@ void EditorState::Save()
     f << "}\n";
 }
 
-// ---------- Load ----------
-
+// Tries to run level.lua and parse the returned table back into the rooms vector
 void EditorState::LoadFromFile()
 {
+    // Load the file as a Lua chunk without executing it yet
     if (luaL_loadfile(L, LEVEL_PATH) != LUA_OK)
     {
         lua_pop(L, 1);
         return;
     }
+    // Execute the chunk; it should push one value (the level table) onto the stack
     if (lua_pcall(L, 0, 1, 0) != LUA_OK)
     {
         lua_pop(L, 1);
@@ -338,19 +335,20 @@ void EditorState::LoadFromFile()
     lua_pop(L, 1);
 }
 
+// Reads the Lua table on top of the stack and fills the rooms vector
 void EditorState::ParseTable()
 {
-    // stack: [level_table]
+    // Stack: [level_table]
     lua_getfield(L, -1, "rooms");
     if (!lua_istable(L, -1)) { lua_pop(L, 1); return; }
 
     int n = (int)lua_rawlen(L, -1);
     for (int i = 1; i <= n; i++)
     {
-        lua_rawgeti(L, -1, i);
+        lua_rawgeti(L, -1, i);  // push rooms[i]
         EdRoom room;
 
-        // spawn
+        // Read spawn position
         lua_getfield(L, -1, "spawn");
         if (lua_istable(L, -1))
         {
@@ -359,7 +357,7 @@ void EditorState::ParseTable()
         }
         lua_pop(L, 1);
 
-        // platforms
+        // Read platform array
         lua_getfield(L, -1, "platforms");
         if (lua_istable(L, -1))
         {
@@ -378,7 +376,7 @@ void EditorState::ParseTable()
         }
         lua_pop(L, 1);
 
-        // enemies
+        // Read enemy array
         lua_getfield(L, -1, "enemies");
         if (lua_istable(L, -1))
         {
@@ -397,7 +395,7 @@ void EditorState::ParseTable()
         lua_pop(L, 1);
 
         rooms.push_back(room);
-        lua_pop(L, 1);
+        lua_pop(L, 1);  // pop rooms[i]
     }
-    lua_pop(L, 1); // pop rooms table
+    lua_pop(L, 1);  // pop rooms table
 }

@@ -2,6 +2,7 @@
 
 GameplayState::GameplayState(entt::registry& reg, LuaManager& lua) : registry(reg), luaManager(lua) {}
 
+// Clears all entities and reloads the level script so every playthrough starts fresh
 void GameplayState::Init()
 {
     gameOver = false;
@@ -14,12 +15,14 @@ void GameplayState::Init()
 
 void GameplayState::Update(GameState& current_state)
 {
+    // R returns to main menu at any time
     if (IsKeyPressed(KEY_R))
     {
         current_state = MAIN_MENU;
         return;
     }
 
+    // Show the game-over screen and return to menu after 3 seconds
     if (gameOver)
     {
         gameOverTimer--;
@@ -34,6 +37,7 @@ void GameplayState::Update(GameState& current_state)
         return;
     }
 
+    // Show the win screen and return to menu after 3 seconds
     if (gameWon)
     {
         gameWonTimer--;
@@ -48,18 +52,21 @@ void GameplayState::Update(GameState& current_state)
         return;
     }
 
+    // Run all gameplay systems in order each frame
     InputSystem(registry);
     AttackSystem(registry);
     CollisionSystem(registry);
     MovementSystem(registry);
     FallDeathSystem(registry);
 
+    // Check whether the Lua room_manager triggered a win this frame
     if (luaManager.HasWon())
     {
         gameWon = true;
         gameWonTimer = 180;
     }
 
+    // Check if the player's HP has dropped to zero
     auto playerView = registry.view<PlayerTagComponent, HealthComponent>();
     playerView.each([&](auto entity, HealthComponent& health)
         {
@@ -74,6 +81,7 @@ void GameplayState::Update(GameState& current_state)
     ClearBackground(BLUE);
     RenderSystem(registry);
 
+    // Hint text once the room is cleared but only while the player entity exists
     bool hasPlayer  = !registry.view<PlayerTagComponent>().empty();
     bool hasEnemies = !registry.view<EnemyTagComponent>().empty();
     if (hasPlayer && !hasEnemies)
