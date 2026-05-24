@@ -3,6 +3,8 @@ function enemy_patrol(entity_id)
     local WINDUP_FRAMES = 30
     local ATTACK_FRAMES = 15
     local COOLDOWN_FRAMES = 60
+    local E_WIDTH = 25.0
+    local E_HEIGHT = 75.0
 
     while true do
         if not ecs.is_stunned(entity_id) then
@@ -12,21 +14,24 @@ function enemy_patrol(entity_id)
 
             if dist <= ATTACK_RANGE then
                 ecs.set_velocity_x(entity_id, 0.0)
-                for i = 1, WINDUP_FRAMES do
-                    coroutine.yield()
-                end
+                for i = 1, WINDUP_FRAMES do coroutine.yield() end
                 ecs.create_enemy_attack(entity_id, 10)
-                for i = 1, ATTACK_FRAMES do
-                    coroutine.yield()
-                end
-                for i = 1, COOLDOWN_FRAMES do
-                    coroutine.yield()
-                end
+                for i = 1, ATTACK_FRAMES do coroutine.yield() end
+                for i = 1, COOLDOWN_FRAMES do coroutine.yield() end
             else
+                local ground_y = ey + E_HEIGHT + 2.0
                 if px > ex then
-                    ecs.set_velocity_x(entity_id, 80.0)
+                    if ecs.has_ground_at(ex + E_WIDTH + 2.0, ground_y) then
+                        ecs.set_velocity_x(entity_id, 80.0)
+                    else
+                        ecs.set_velocity_x(entity_id, 0.0)
+                    end
                 else
-                    ecs.set_velocity_x(entity_id, -80.0)
+                    if ecs.has_ground_at(ex - 2.0, ground_y) then
+                        ecs.set_velocity_x(entity_id, -80.0)
+                    else
+                        ecs.set_velocity_x(entity_id, 0.0)
+                    end
                 end
             end
         end
@@ -94,6 +99,22 @@ function boss_behaviour(entity_id)
 end
 
 function room_manager(entity_id)
+    local current_platforms = {}
+
+    local function clear_platforms()
+        for _, pid in ipairs(current_platforms) do
+            ecs.destroy_entity(pid)
+        end
+        current_platforms = {}
+    end
+
+    local function spawn_platforms(layout)
+        for _, p in ipairs(layout) do
+            local id = ecs.add_platform(p[1], p[2], p[3], p[4])
+            table.insert(current_platforms, id)
+        end
+    end
+
     local function spawn_enemy(x, y)
         local e = ecs.create_entity()
         ecs.add_transform(e, x, y)
@@ -105,13 +126,21 @@ function room_manager(entity_id)
         ecs.add_behaviour(e, "enemy_patrol")
     end
 
+    -- {x, y, width, height} per platform per room
+    local room_layouts = {
+        -- Room 1: left ground, middle elevated, right ground
+        { {0, 500, 300, 20}, {350, 420, 200, 20}, {600, 500, 300, 20} },
+        -- Room 2: two short ground stubs + two elevated platforms
+        { {0, 500, 180, 20}, {160, 390, 180, 20}, {460, 390, 180, 20}, {720, 500, 180, 20} },
+        -- Room 3: full ground for boss
+        { {0, 500, 900, 20} },
+    }
+
     local rooms = {
+        function() spawn_enemy(640.0, 425.0) end,
         function()
-            spawn_enemy(600.0, 425.0)
-        end,
-        function()
-            spawn_enemy(350.0, 425.0)
-            spawn_enemy(650.0, 425.0)
+            spawn_enemy(190.0, 315.0)
+            spawn_enemy(470.0, 315.0)
         end,
         function()
             local boss = ecs.create_entity()
@@ -123,11 +152,12 @@ function room_manager(entity_id)
             ecs.add_enemy_tag(boss)
             ecs.add_boss_tag(boss)
             ecs.add_behaviour(boss, "boss_behaviour")
-        end
+        end,
     }
 
+    spawn_platforms(room_layouts[1])
+    rooms[1]()
     local current = 1
-    rooms[current]()
 
     while true do
         local is_last = (current == #rooms)
@@ -139,6 +169,8 @@ function room_manager(entity_id)
             local px, py = ecs.get_player_position()
             if ecs.get_enemy_count() == 0 and px >= 860.0 then
                 current = current + 1
+                clear_platforms()
+                spawn_platforms(room_layouts[current])
                 ecs.reset_player_position(50.0, 200.0)
                 rooms[current]()
             end
@@ -155,11 +187,6 @@ ecs.add_physics(player, 1.0)
 ecs.add_collision(player, 25.0, 75.0)
 ecs.add_facing(player)
 ecs.add_health(player, 100)
-
-local platform = ecs.create_entity()
-ecs.add_transform(platform, 0.0, 500.0)
-ecs.add_collision(platform, 900.0, 20.0)
-ecs.add_platform_tag(platform)
 
 local manager = ecs.create_entity()
 ecs.add_behaviour(manager, "room_manager")

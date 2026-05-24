@@ -52,6 +52,7 @@ void GameplayState::Update(GameState& current_state)
     AttackSystem(registry);
     CollisionSystem(registry);
     MovementSystem(registry);
+    FallDeathSystem(registry);
 
     if (luaManager.HasWon())
     {

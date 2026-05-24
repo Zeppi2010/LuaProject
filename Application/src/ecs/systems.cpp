@@ -292,3 +292,26 @@ void AttackSystem(entt::registry& registry)
 			registry.destroy(e);
 	}
 }
+
+void FallDeathSystem(entt::registry& registry)
+{
+	const float DEATH_Y = 620.0f;
+
+	std::vector<entt::entity> toDestroy;
+	auto enemyView = registry.view<EnemyTagComponent, TransformComponent>();
+	enemyView.each([&](auto entity, TransformComponent& t)
+		{
+			if (t.yPos > DEATH_Y)
+				toDestroy.push_back(entity);
+		});
+	for (auto e : toDestroy)
+		if (registry.valid(e))
+			registry.destroy(e);
+
+	auto playerView = registry.view<PlayerTagComponent, TransformComponent, HealthComponent>();
+	playerView.each([](auto entity, TransformComponent& t, HealthComponent& health)
+		{
+			if (t.yPos > DEATH_Y)
+				health.currentHP = 0;
+		});
+}

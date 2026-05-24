@@ -246,6 +246,33 @@ void LuaManager::Init()
                     velocity.xV = xV;
                 }
             })
+        .addFunction("add_platform", [this](float x, float y, float width, float height) -> uint32_t
+            {
+                auto entity = registry.create();
+                registry.emplace<TransformComponent>(entity, x, y);
+                registry.emplace<CollisionComponent>(entity, width, height);
+                registry.emplace<PlatformTagComponent>(entity);
+                return (uint32_t)entity;
+            })
+        .addFunction("destroy_entity", [this](uint32_t id)
+            {
+                auto entity = (entt::entity)id;
+                if (registry.valid(entity))
+                    registry.destroy(entity);
+            })
+        .addFunction("has_ground_at", [this](float x, float y) -> bool
+            {
+                auto view = registry.view<PlatformTagComponent, TransformComponent, CollisionComponent>();
+                for (auto entity : view)
+                {
+                    auto& t = registry.get<TransformComponent>(entity);
+                    auto& c = registry.get<CollisionComponent>(entity);
+                    if (x >= t.xPos && x <= t.xPos + c.width &&
+                        y >= t.yPos && y <= t.yPos + c.height)
+                        return true;
+                }
+                return false;
+            })
         .endNamespace();
 }
 void LuaManager::Reset()
