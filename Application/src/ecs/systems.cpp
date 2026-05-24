@@ -25,8 +25,9 @@ void RenderSystem(entt::registry& registry)
 				if ((inv.framesLeft / 5) % 2 == 0) return;
 			}
 
+			Color color = registry.all_of<BossTagComponent>(entity) ? PURPLE : RED;
 			DrawRectangle((int)transform.xPos, (int)transform.yPos,
-				(int)collision.width, (int)collision.height, RED);
+				(int)collision.width, (int)collision.height, color);
 		});
 
 	auto hpView = registry.view<PlayerTagComponent, HealthComponent>();

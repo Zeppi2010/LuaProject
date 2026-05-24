@@ -133,7 +133,7 @@ void LuaManager::Init()
                 return registry.valid(entity) && registry.all_of<StunnedComponent>(entity);
             })
 
-        .addFunction("create_enemy_attack", [this](uint32_t id)
+        .addFunction("create_enemy_attack", [this](uint32_t id, int damage)
             {
                 auto entity = (entt::entity)id;
                 if (!registry.valid(entity) || !registry.all_of<TransformComponent, CollisionComponent>(entity)) return;
@@ -152,8 +152,70 @@ void LuaManager::Init()
                 registry.emplace<TransformComponent>(attack, attackX, transform.yPos + 20.0f);
                 registry.emplace<CollisionComponent>(attack, 30.0f, 40.0f);
                 registry.emplace<AttackTagComponent>(attack);
-                registry.emplace<DamageComponent>(attack, 10);
+                registry.emplace<DamageComponent>(attack, damage);
                 registry.emplace<AttackComponent>(attack, 15, entity, attackRight);
+            })
+        .addFunction("set_velocity_y", [this](uint32_t id, float yV)
+            {
+                auto entity = (entt::entity)id;
+                if (registry.valid(entity) && registry.all_of<VelocityComponent>(entity))
+                {
+                    registry.get<VelocityComponent>(entity).yV = yV;
+                }
+            })
+        .addFunction("set_position", [this](uint32_t id, float x, float y)
+            {
+                auto entity = (entt::entity)id;
+                if (registry.valid(entity) && registry.all_of<TransformComponent>(entity))
+                {
+                    auto& t = registry.get<TransformComponent>(entity);
+                    t.xPos = x;
+                    t.yPos = y;
+                }
+            })
+        .addFunction("set_collision_size", [this](uint32_t id, float width, float height)
+            {
+                auto entity = (entt::entity)id;
+                if (registry.valid(entity) && registry.all_of<CollisionComponent>(entity))
+                {
+                    auto& c = registry.get<CollisionComponent>(entity);
+                    c.width = width;
+                    c.height = height;
+                }
+            })
+        .addFunction("get_health", [this](uint32_t id) -> std::tuple<int, int>
+            {
+                auto entity = (entt::entity)id;
+                if (registry.valid(entity) && registry.all_of<HealthComponent>(entity))
+                {
+                    auto& h = registry.get<HealthComponent>(entity);
+                    return std::make_tuple(h.currentHP, h.maxHP);
+                }
+                return std::make_tuple(0, 0);
+            })
+        .addFunction("is_grounded", [this](uint32_t id) -> bool
+            {
+                auto entity = (entt::entity)id;
+                if (registry.valid(entity) && registry.all_of<PhysicsComponent>(entity))
+                    return registry.get<PhysicsComponent>(entity).isGrounded;
+                return false;
+            })
+        .addFunction("get_enemy_count", [this]() -> int
+            {
+                int count = 0;
+                auto view = registry.view<EnemyTagComponent>();
+                view.each([&](auto entity)
+                    {
+                        if (!registry.all_of<BossTagComponent>(entity))
+                            count++;
+                    });
+                return count;
+            })
+        .addFunction("add_boss_tag", [this](uint32_t id)
+            {
+                auto entity = (entt::entity)id;
+                if (registry.valid(entity))
+                    registry.emplace<BossTagComponent>(entity);
             })
         .addFunction("set_velocity_x", [this](uint32_t id, float xV)
             {
