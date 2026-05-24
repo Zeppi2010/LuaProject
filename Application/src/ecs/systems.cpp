@@ -87,9 +87,10 @@ void MovementSystem(entt::registry& registry)
 void InputSystem(entt::registry& registry)
 {
 	auto view = registry.view<PlayerTagComponent, VelocityComponent, PhysicsComponent, FacingComponent>();
-	view.each([](auto entity, VelocityComponent& velocity, PhysicsComponent& physics, FacingComponent& facing)
+	view.each([&](auto entity, VelocityComponent& velocity, PhysicsComponent& physics, FacingComponent& facing)
 		{
-			velocity.xV = 0;
+			if (!registry.all_of<InvincibilityComponent>(entity))
+				velocity.xV = 0;
 			if (IsKeyDown(KEY_A))
 			{
 				facing.facingRight = false;

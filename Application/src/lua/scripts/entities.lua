@@ -1,7 +1,8 @@
 function enemy_patrol(entity_id)
-    local ATTACK_RANGE = 80.0
+    local ATTACK_RANGE = 50.0
     local WINDUP_FRAMES = 30
     local ATTACK_FRAMES = 15
+    local COOLDOWN_FRAMES = 60
 
     while true do
         if not ecs.is_stunned(entity_id) then
@@ -16,6 +17,9 @@ function enemy_patrol(entity_id)
                 end
                 ecs.create_enemy_attack(entity_id)
                 for i = 1, ATTACK_FRAMES do
+                    coroutine.yield()
+                end
+                for i = 1, COOLDOWN_FRAMES do
                     coroutine.yield()
                 end
             else
