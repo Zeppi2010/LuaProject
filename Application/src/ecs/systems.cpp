@@ -1,5 +1,6 @@
 #include "systems.h"
 #include <iostream>
+#include <algorithm>
 
 void RenderSystem(entt::registry& registry)
 {
@@ -14,11 +15,24 @@ void RenderSystem(entt::registry& registry)
 	auto characterView = registry.view<TransformComponent, CollisionComponent>();
 	characterView.each([&](auto entity, TransformComponent& transform, CollisionComponent& collision)
 		{
-			if (!registry.all_of<PlatformTagComponent>(entity) && !registry.all_of<AttackTagComponent>(entity))
+			if (registry.all_of<PlatformTagComponent>(entity) || registry.all_of<AttackTagComponent>(entity))
+				return;
+
+			if (registry.all_of<InvincibilityComponent>(entity))
 			{
-				DrawRectangle((int)transform.xPos, (int)transform.yPos,
-					(int)collision.width, (int)collision.height, RED);
+				auto& inv = registry.get<InvincibilityComponent>(entity);
+				if ((inv.framesLeft / 5) % 2 == 0) return;
 			}
+
+			DrawRectangle((int)transform.xPos, (int)transform.yPos,
+				(int)collision.width, (int)collision.height, RED);
+		});
+
+	auto hpView = registry.view<PlayerTagComponent, HealthComponent>();
+	hpView.each([](auto entity, HealthComponent& health)
+		{
+			std::string hpText = "HP: " + std::to_string(health.currentHP) + " / " + std::to_string(health.maxHP);
+			DrawText(hpText.c_str(), 10, 10, 20, WHITE);
 		});
 
 	auto attackView = registry.view<AttackTagComponent, TransformComponent, CollisionComponent>();
@@ -40,11 +54,19 @@ void MovementSystem(entt::registry& registry)
 		{
 			if (physics.isGrounded)
 			{
-				velocity.xV = 0;  // ? nollst�ll bara n�r p� marken
+				velocity.xV = 0;
 				stun.groundedFrames++;
 				if (stun.groundedFrames >= 120)
 					registry.remove<StunnedComponent>(entity);
 			}
+		});
+
+	auto invincView = registry.view<InvincibilityComponent>();
+	invincView.each([&](auto entity, InvincibilityComponent& inv)
+		{
+			inv.framesLeft--;
+			if (inv.framesLeft <= 0)
+				registry.remove<InvincibilityComponent>(entity);
 		});
 	physView.each([GRAVITY, dt](auto entity, PhysicsComponent& physics, VelocityComponent& velocity)
 		{
@@ -140,56 +162,89 @@ void AttackSystem(entt::registry& registry)
 			}
 		});
 
-	// hantera aktiva attacker
 	std::vector<entt::entity> toDestroy;
 	auto attackView = registry.view<AttackTagComponent, TransformComponent, CollisionComponent, AttackComponent, DamageComponent>();
 	attackView.each([&](auto attackEntity, TransformComponent& atkTransform, CollisionComponent& atkCollision, AttackComponent& attack, DamageComponent& damage)
 		{
 			attack.framesLeft--;
 
-			// kolla kollision mot fiender
-			auto enemyView = registry.view<EnemyTagComponent, TransformComponent, CollisionComponent, HealthComponent, VelocityComponent>();
-			enemyView.each([&](auto enemyEntity, TransformComponent& enemyTransform, CollisionComponent& enemyCollision, HealthComponent& health, VelocityComponent& enemyVelocity)
-				{
-					float atkLeft = atkTransform.xPos;
-					float atkRight = atkTransform.xPos + atkCollision.width;
-					float atkTop = atkTransform.yPos;
-					float atkBottom = atkTransform.yPos + atkCollision.height;
+			bool ownerIsEnemy = registry.valid(attack.owner) && registry.all_of<EnemyTagComponent>(attack.owner);
 
-					float eLeft = enemyTransform.xPos;
-					float eRight = enemyTransform.xPos + enemyCollision.width;
-					float eTop = enemyTransform.yPos;
-					float eBottom = enemyTransform.yPos + enemyCollision.height;
-
-					bool overlaps = atkRight > eLeft && atkLeft < eRight &&
-						atkBottom > eTop && atkTop < eBottom;
-
-					if (overlaps)
+			if (ownerIsEnemy)
+			{
+				auto playerView = registry.view<PlayerTagComponent, TransformComponent, CollisionComponent, HealthComponent, VelocityComponent>();
+				playerView.each([&](auto playerEntity, TransformComponent& pTransform, CollisionComponent& pCollision, HealthComponent& health, VelocityComponent& pVelocity)
 					{
-						// kolla om fienden redan tr�ffats av denna attack
-						if (registry.all_of<HitByComponent>(enemyEntity))
+						if (registry.all_of<InvincibilityComponent>(playerEntity)) return;
+						if (registry.all_of<HitByComponent>(playerEntity))
 						{
-							auto& hitBy = registry.get<HitByComponent>(enemyEntity);
+							auto& hitBy = registry.get<HitByComponent>(playerEntity);
 							if (hitBy.attackEntity == attackEntity) return;
 						}
 
-						registry.emplace_or_replace<HitByComponent>(enemyEntity, attackEntity);
-						registry.emplace_or_replace<StunnedComponent>(enemyEntity);
-						health.currentHP -= damage.damage;
-						enemyVelocity.xV = (enemyTransform.xPos > atkTransform.xPos) ? 200.0f : -200.0f;
-						enemyVelocity.yV = -150.0f;
+						float atkLeft = atkTransform.xPos;
+						float atkRight = atkTransform.xPos + atkCollision.width;
+						float atkTop = atkTransform.yPos;
+						float atkBottom = atkTransform.yPos + atkCollision.height;
 
-						if (health.currentHP <= 0)
+						float pLeft = pTransform.xPos;
+						float pRight = pTransform.xPos + pCollision.width;
+						float pTop = pTransform.yPos;
+						float pBottom = pTransform.yPos + pCollision.height;
+
+						bool overlaps = atkRight > pLeft && atkLeft < pRight &&
+							atkBottom > pTop && atkTop < pBottom;
+
+						if (overlaps)
 						{
-							toDestroy.push_back(enemyEntity);
+							registry.emplace_or_replace<HitByComponent>(playerEntity, attackEntity);
+							registry.emplace_or_replace<InvincibilityComponent>(playerEntity, 60);
+							health.currentHP = std::max(0, health.currentHP - damage.damage);
+							pVelocity.xV = (pTransform.xPos > atkTransform.xPos) ? 250.0f : -250.0f;
+							pVelocity.yV = -200.0f;
 						}
-					}
-				});
+					});
+			}
+			else
+			{
+				auto enemyView = registry.view<EnemyTagComponent, TransformComponent, CollisionComponent, HealthComponent, VelocityComponent>();
+				enemyView.each([&](auto enemyEntity, TransformComponent& enemyTransform, CollisionComponent& enemyCollision, HealthComponent& health, VelocityComponent& enemyVelocity)
+					{
+						float atkLeft = atkTransform.xPos;
+						float atkRight = atkTransform.xPos + atkCollision.width;
+						float atkTop = atkTransform.yPos;
+						float atkBottom = atkTransform.yPos + atkCollision.height;
+
+						float eLeft = enemyTransform.xPos;
+						float eRight = enemyTransform.xPos + enemyCollision.width;
+						float eTop = enemyTransform.yPos;
+						float eBottom = enemyTransform.yPos + enemyCollision.height;
+
+						bool overlaps = atkRight > eLeft && atkLeft < eRight &&
+							atkBottom > eTop && atkTop < eBottom;
+
+						if (overlaps)
+						{
+							if (registry.all_of<HitByComponent>(enemyEntity))
+							{
+								auto& hitBy = registry.get<HitByComponent>(enemyEntity);
+								if (hitBy.attackEntity == attackEntity) return;
+							}
+
+							registry.emplace_or_replace<HitByComponent>(enemyEntity, attackEntity);
+							registry.emplace_or_replace<StunnedComponent>(enemyEntity);
+							health.currentHP -= damage.damage;
+							enemyVelocity.xV = (enemyTransform.xPos > atkTransform.xPos) ? 200.0f : -200.0f;
+							enemyVelocity.yV = -150.0f;
+
+							if (health.currentHP <= 0)
+								toDestroy.push_back(enemyEntity);
+						}
+					});
+			}
 
 			if (attack.framesLeft <= 0)
-			{
 				toDestroy.push_back(attackEntity);
-			}
 		});
 
 	for (auto e : toDestroy)

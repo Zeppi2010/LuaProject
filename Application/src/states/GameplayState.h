@@ -15,4 +15,6 @@ public:
 private:
     entt::registry& registry;
     LuaManager& luaManager;
+    bool gameOver = false;
+    int gameOverTimer = 0;
 };

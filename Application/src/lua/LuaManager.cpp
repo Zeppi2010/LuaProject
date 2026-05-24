@@ -133,6 +133,28 @@ void LuaManager::Init()
                 return registry.valid(entity) && registry.all_of<StunnedComponent>(entity);
             })
 
+        .addFunction("create_enemy_attack", [this](uint32_t id)
+            {
+                auto entity = (entt::entity)id;
+                if (!registry.valid(entity) || !registry.all_of<TransformComponent, CollisionComponent>(entity)) return;
+
+                auto& transform = registry.get<TransformComponent>(entity);
+                auto& collision = registry.get<CollisionComponent>(entity);
+
+                float px = transform.xPos;
+                auto playerView = registry.view<PlayerTagComponent, TransformComponent>();
+                playerView.each([&](auto e, TransformComponent& t) { px = t.xPos; });
+
+                bool attackRight = px > transform.xPos;
+                float attackX = attackRight ? transform.xPos + collision.width : transform.xPos - 30.0f;
+
+                auto attack = registry.create();
+                registry.emplace<TransformComponent>(attack, attackX, transform.yPos + 20.0f);
+                registry.emplace<CollisionComponent>(attack, 30.0f, 40.0f);
+                registry.emplace<AttackTagComponent>(attack);
+                registry.emplace<DamageComponent>(attack, 10);
+                registry.emplace<AttackComponent>(attack, 15, entity);
+            })
         .addFunction("set_velocity_x", [this](uint32_t id, float xV)
             {
                 auto entity = (entt::entity)id;
